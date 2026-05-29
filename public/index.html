@@ -376,11 +376,11 @@ async function fetchAllData() {
 }
 
 const sumSteps=p=>p.reduce((a,x)=>a+parseInt(x.steps?.count||0),0);
-const avgHR=p=>{const v=p.map(x=>x.heartRate?.bpm||x.heart_rate?.bpm).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
+const avgHR=p=>{const v=p.map(x=>parseInt(x.heartRate?.beatsPerMinute)).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
 const totalSleep=p=>{if(!p.length)return null;const t=p.reduce((a,x)=>a+(new Date(x.sleep?.interval?.endTime)-new Date(x.sleep?.interval?.startTime)),0);return(t/3600000).toFixed(1);};
-const avgSpo2=p=>{const v=p.map(x=>x.dailyOxygenSaturation?.avg||x.dailyOxygenSaturation?.percentage).filter(Boolean);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null;};
-const sumCal=p=>Math.round(p.reduce((a,x)=>a+parseFloat(x.totalCalories?.kcal||x.totalCalories?.calories||0),0));
-const avgHrv=p=>{const v=p.map(x=>x.dailyHeartRateVariability?.rmssdMilliseconds||x.dailyHeartRateVariability?.dailyRmssd).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
+const avgSpo2=p=>{const v=p.map(x=>x.dailyOxygenSaturation?.averagePercentage).filter(v=>typeof v==='number');return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null;};
+const sumCal=p=>Math.round(p.reduce((a,x)=>a+parseFloat(x.totalCalories?.energy?.kcal||x.totalCalories?.kcal||0),0));
+const avgHrv=p=>{const v=p.map(x=>x.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds).filter(v=>typeof v==='number');return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
 
 function renderMetrics(d){
   const steps=sumSteps(d.steps||[]), hr=avgHR(d.heart_rate||[]), sleep=totalSleep(d.sleep||[]), spo2=avgSpo2(d.spo2||[]), cal=sumCal(d.calories||[]), hrv=avgHrv(d.hrv||[]);
@@ -402,14 +402,14 @@ function renderTable(){
     // figure out the data object key inside the raw point
     const obj=raw.steps||raw.heartRate||raw.sleep||raw.totalCalories||raw.dailyOxygenSaturation||raw.dailyHeartRateVariability||{};
     const ts=obj.interval?.startTime||obj.sampleTime?.physicalTime||null;
-    const time=ts?new Date(ts).toLocaleString():(obj.civilDate?`${obj.civilDate.year}-${obj.civilDate.month}-${obj.civilDate.day}`:'—');
+    const time=ts?new Date(ts).toLocaleString():(obj.date?`${obj.date.year}-${obj.date.month}-${obj.date.day}`:'—');
     let v='—';
     if(t==='steps')v=(raw.steps?.count||0)+' steps';
-    else if(t==='heart_rate')v=(raw.heartRate?.bpm||0)+' bpm';
+    else if(t==='heart_rate')v=(raw.heartRate?.beatsPerMinute||0)+' bpm';
     else if(t==='sleep'){const s=new Date(raw.sleep?.interval?.startTime),e=new Date(raw.sleep?.interval?.endTime);v=((e-s)/3600000).toFixed(1)+' hrs';}
-    else if(t==='spo2')v=(raw.dailyOxygenSaturation?.avg||raw.dailyOxygenSaturation?.percentage||0).toFixed(1)+'%';
-    else if(t==='calories')v=(raw.totalCalories?.kcal||raw.totalCalories?.calories||0).toFixed(1)+' kcal';
-    else if(t==='hrv')v=(raw.dailyHeartRateVariability?.rmssdMilliseconds||raw.dailyHeartRateVariability?.dailyRmssd||0).toFixed(1)+' ms';
+    else if(t==='spo2')v=(raw.dailyOxygenSaturation?.averagePercentage||0).toFixed(1)+'%';
+    else if(t==='calories')v=(raw.totalCalories?.energy?.kcal||raw.totalCalories?.kcal||0).toFixed(1)+' kcal';
+    else if(t==='hrv')v=(raw.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds||0).toFixed(1)+' ms';
     const tc=t==='heart_rate'?'heart':t==='spo2'?'spo2':t==='sleep'?'sleep':'activity';
     return `<tr><td>${time}</td><td><span class="tag ${tc}">${t.replace(/_/g,' ')}</span></td><td class="mono">${v}</td></tr>`;
   }).join('');
