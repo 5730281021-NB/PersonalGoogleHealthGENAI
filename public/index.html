@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health × Claude</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f0e;
+    --surface: #151817;
+    --surface2: #1c1f1e;
+    --border: rgba(255,255,255,0.07);
+    --accent: #00e5a0;
+    --accent2: #00b87a;
+    --text: #e8ede9;
+    --muted: #6b7870;
+    --danger: #ff5c5c;
+    --warn: #f5a623;
+    --blue: #4fa3e0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 2rem 1.5rem;
+    display: flex; flex-direction: column; gap: 2rem;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .main { padding: 2rem 2.5rem; overflow-y: auto; }
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500;
+    letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; color: #000; font-size: 16px;
+  }
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+    border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--muted);
+    transition: all 0.15s; border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: rgba(0,229,160,0.1); color: var(--accent); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .status-pill {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    border-radius: 10px; background: var(--surface2); border: 1px solid var(--border); font-size: 13px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.green { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .page { display: none; }
+  .page.active { display: block; }
+  h1 { font-size: 26px; font-weight: 500; margin-bottom: 6px; }
+  h2 { font-size: 18px; font-weight: 500; margin-bottom: 1rem; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 2rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem 1.5rem; }
+  .metric-label { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .metric-value { font-size: 28px; font-weight: 300; font-family: 'DM Mono', monospace; color: var(--accent); }
+  .metric-unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+  input, textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; color: var(--text); font-family: 'DM Mono', monospace; font-size: 13px;
+    outline: none; transition: border-color 0.15s; margin-bottom: 12px;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px;
+    border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(255,92,92,0.15); color: var(--danger); border: 1px solid rgba(255,92,92,0.3); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chat-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; height: 420px;
+    overflow-y: auto; padding: 1.25rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 1rem; scroll-behavior: smooth;
+  }
+  .msg { display: flex; flex-direction: column; gap: 4px; max-width: 85%; }
+  .msg.user { align-self: flex-end; align-items: flex-end; }
+  .msg.assistant { align-self: flex-start; align-items: flex-start; }
+  .bubble { padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .msg.user .bubble { background: rgba(0,229,160,0.15); border: 1px solid rgba(0,229,160,0.2); }
+  .msg.assistant .bubble { background: var(--surface); border: 1px solid var(--border); }
+  .msg-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input { margin-bottom: 0; flex: 1; }
+  .steps { display: flex; flex-direction: column; gap: 1rem; }
+  .step { display: flex; gap: 1rem; align-items: flex-start; padding: 1.25rem 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%; background: rgba(0,229,160,0.15); border: 1px solid rgba(0,229,160,0.3);
+    color: var(--accent); font-size: 12px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: 'DM Mono', monospace;
+  }
+  .step-title { font-weight: 500; margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .step-desc a { color: var(--accent); text-decoration: none; }
+  code { font-family: 'DM Mono', monospace; font-size: 12px; background: var(--surface2); padding: 2px 6px; border-radius: 4px; color: var(--accent); word-break: break-all; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { text-align: left; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: 'DM Mono', monospace; }
+  .tag.sleep { background: rgba(79,163,224,0.15); color: var(--blue); }
+  .tag.activity { background: rgba(0,229,160,0.15); color: var(--accent); }
+  .tag.heart { background: rgba(255,92,92,0.15); color: var(--danger); }
+  .tag.spo2 { background: rgba(245,166,35,0.15); color: var(--warn); }
+  .empty { text-align: center; padding: 3rem; color: var(--muted); font-size: 14px; }
+  .empty-icon { font-size: 40px; margin-bottom: 1rem; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(0,229,160,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 1rem; }
+  .alert.info { background: rgba(79,163,224,0.1); border: 1px solid rgba(79,163,224,0.2); color: var(--blue); }
+  .alert.warn { background: rgba(245,166,35,0.1); border: 1px solid rgba(245,166,35,0.2); color: var(--warn); }
+  .alert.success { background: rgba(0,229,160,0.1); border: 1px solid rgba(0,229,160,0.2); color: var(--accent); }
+  .alert.error { background: rgba(255,92,92,0.1); border: 1px solid rgba(255,92,92,0.2); color: var(--danger); }
+  .flex-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .spacer { flex: 1; }
+  .divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+  .mono { font-family: 'DM Mono', monospace; }
+  .copy-field { display: flex; gap: 8px; align-items: center; }
+  .copy-field code { flex: 1; padding: 8px 12px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-icon">⚕</div> Health × Claude</div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="showPage('setup')"><span class="nav-icon">⚙</span> Setup</button>
+      <button class="nav-item" onclick="showPage('data')"><span class="nav-icon">📊</span> Health Data</button>
+      <button class="nav-item" onclick="showPage('chat')"><span class="nav-icon">💬</span> Ask Claude</button>
+      <button class="nav-item" onclick="showPage('guide')"><span class="nav-icon">📖</span> Guide</button>
+    </nav>
+    <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
+      <div class="status-pill"><div class="dot" id="google-dot" style="background:var(--muted)"></div><span style="font-size:12px;" id="google-status">Google: not connected</span></div>
+      <div class="status-pill"><div class="dot" id="claude-dot" style="background:var(--muted)"></div><span style="font-size:12px;" id="claude-status">Claude: checking...</span></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- SETUP -->
+    <div class="page active" id="page-setup">
+      <h1>Setup</h1>
+      <p class="subtitle">Connect your Google Health account. Your Claude API key lives safely on the server.</p>
+
+      <div class="alert info">ℹ Your Claude API key is set as a Vercel environment variable — never exposed in the browser. You only need your Google Client ID here.</div>
+
+      <div class="card">
+        <h2>Your redirect URI</h2>
+        <p style="font-size:13px; color:var(--muted); margin-bottom:1rem;">Add this exact URL to <strong>Authorized redirect URIs</strong> in Google Cloud Console → Credentials → your OAuth client:</p>
+        <div class="copy-field">
+          <code id="redirect-uri-display">loading...</code>
+          <button class="btn btn-secondary" style="padding:8px 14px;" onclick="copyRedirect()">Copy</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Google OAuth Client ID</h2>
+        <label>Client ID</label>
+        <input type="text" id="gClientId" placeholder="...apps.googleusercontent.com" />
+        <div class="flex-row">
+          <button class="btn btn-primary" onclick="startGoogleAuth()">🔗 Connect Google Health</button>
+          <button class="btn btn-danger" onclick="disconnectGoogle()" id="btn-disconnect-google" style="display:none">Disconnect</button>
+        </div>
+        <div id="google-auth-status" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="alert warn">⚠ For personal use, add your own Gmail as a Test User in Google Cloud Console → OAuth consent screen. No app verification needed.</div>
+    </div>
+
+    <!-- DATA -->
+    <div class="page" id="page-data">
+      <div class="flex-row" style="margin-bottom:2rem;">
+        <div><h1>Health Data</h1><p class="subtitle" style="margin-bottom:0;">Live from your Fitbit Air via Google Health API</p></div>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" onclick="fetchAllData()" id="btn-refresh">↻ Refresh Data</button>
+      </div>
+      <div class="card-grid">
+        <div class="metric-card"><div class="metric-label">Steps today</div><div class="metric-value" id="m-steps">—</div></div>
+        <div class="metric-card"><div class="metric-label">Resting HR</div><div class="metric-value" id="m-hr">—<span class="metric-unit">bpm</span></div></div>
+        <div class="metric-card"><div class="metric-label">Sleep last night</div><div class="metric-value" id="m-sleep">—<span class="metric-unit">hrs</span></div></div>
+        <div class="metric-card"><div class="metric-label">SpO2 avg</div><div class="metric-value" id="m-spo2">—<span class="metric-unit">%</span></div></div>
+        <div class="metric-card"><div class="metric-label">Calories burned</div><div class="metric-value" id="m-cal">—</div></div>
+        <div class="metric-card"><div class="metric-label">HRV</div><div class="metric-value" id="m-hrv">—<span class="metric-unit">ms</span></div></div>
+      </div>
+      <div class="alert warn" id="spo2-note" style="display:none">⚠ SpO2 &amp; breathing rate may show no data in Thailand — these features are regionally restricted by Google.</div>
+      <div class="card">
+        <div class="flex-row" style="margin-bottom:1rem;">
+          <h2 style="margin-bottom:0;">Recent data points</h2>
+          <div class="spacer"></div>
+          <select id="data-type-filter" onchange="renderTable()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;">
+            <option value="all">All types</option>
+            <option value="sleep">Sleep</option>
+            <option value="activity">Activity</option>
+            <option value="heart_rate">Heart Rate</option>
+            <option value="spo2">SpO2</option>
+          </select>
+        </div>
+        <div id="data-table-container"><div class="empty"><div class="empty-icon">📡</div>Connect Google Health and click "Refresh Data".</div></div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="page" id="page-chat">
+      <h1>Ask Claude</h1>
+      <p class="subtitle">Claude has your health data as context and answers questions about it.</p>
+      <div class="flex-row" style="margin-bottom:1rem; gap:6px;">
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('How did I sleep last night?')">How did I sleep?</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('Is my resting heart rate normal?')">Is my HR normal?</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('Give me a summary of my health today.')">Today's summary</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('Should I work out today based on my recovery?')">Should I work out?</button>
+      </div>
+      <div class="chat-box" id="chat-box">
+        <div class="msg assistant"><div class="bubble">Hi! I'm Claude. Connect Google Health and fetch your data, then ask me anything about your Fitbit Air metrics.</div><div class="msg-meta">Claude · ready</div></div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chat-input" placeholder="Ask about your health data..." onkeydown="if(event.key==='Enter')sendMessage()" />
+        <button class="btn btn-primary" onclick="sendMessage()" id="btn-send">Send</button>
+      </div>
+    </div>
+
+    <!-- GUIDE -->
+    <div class="page" id="page-guide">
+      <h1>Deploy &amp; Setup Guide</h1>
+      <p class="subtitle">From zero to running on Vercel.</p>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div><div class="step-title">Push to GitHub & import to Vercel</div><div class="step-desc">Upload this folder to a GitHub repo, then go to <a href="https://vercel.com/new" target="_blank">vercel.com/new</a> and import it. Vercel auto-detects the config.</div></div></div>
+        <div class="step"><div class="step-num">2</div><div><div class="step-title">Add your Anthropic key as an env variable</div><div class="step-desc">In Vercel → Project → Settings → Environment Variables, add <code>ANTHROPIC_API_KEY</code> with your <code>sk-ant-...</code> key. Redeploy after adding.</div></div></div>
+        <div class="step"><div class="step-num">3</div><div><div class="step-title">Create a Google Cloud project</div><div class="step-desc"><a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → New Project. Enable the <strong>Google Health API</strong> under APIs & Services → Library.</div></div></div>
+        <div class="step"><div class="step-num">4</div><div><div class="step-title">Set up OAuth consent + client</div><div class="step-desc">OAuth consent screen → External → add your Gmail as a Test User. Then Credentials → Create OAuth Client ID → Web application. Add your Vercel URL (shown on the Setup page) to Authorized redirect URIs.</div></div></div>
+        <div class="step"><div class="step-num">5</div><div><div class="step-title">Add health scopes</div><div class="step-desc">In OAuth consent → Scopes, add <code>googlehealth.activity_and_fitness.readonly</code>, <code>googlehealth.health_metrics_and_measurements.readonly</code>, and <code>googlehealth.sleep.readonly</code>.</div></div></div>
+        <div class="step"><div class="step-num">6</div><div><div class="step-title">Connect & go</div><div class="step-desc">Open your deployed site → Setup → paste your Client ID → Connect Google Health → Refresh Data → start chatting.</div></div></div>
+      </div>
+      <div class="divider"></div>
+      <div class="alert info">ℹ <strong>Security note:</strong> Your Anthropic key stays server-side via the <code>/api/chat</code> serverless function. The browser never sees it.</div>
+    </div>
+  </main>
+</div>
+
+<script>
+let accessToken = localStorage.getItem('gh_access_token') || null;
+let healthData = JSON.parse(localStorage.getItem('gh_health_data') || 'null');
+let chatHistory = [];
+let allDataPoints = [];
+const REDIRECT_URI = window.location.origin;
+
+const SCOPES = [
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+].join(' ');
+
+window.onload = () => {
+  document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
+  const cid = localStorage.getItem('gh_client_id');
+  if (cid) document.getElementById('gClientId').value = cid;
+  handleOAuthCallback();
+  checkClaude();
+  updateBadges();
+  if (healthData) { renderMetrics(healthData); document.getElementById('spo2-note').style.display='block'; }
+};
+
+function copyRedirect() {
+  navigator.clipboard.writeText(REDIRECT_URI);
+  showAlert('google-auth-status','success','✓ Copied redirect URI');
+}
+
+async function checkClaude() {
+  try {
+    const res = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({messages:[{role:'user',content:'ping'}], max_tokens:10}) });
+    const data = await res.json();
+    const cDot = document.getElementById('claude-dot');
+    const cStatus = document.getElementById('claude-status');
+    if (data.error && data.error.includes && data.error.includes('not configured')) {
+      cStatus.textContent = 'Claude: key missing';
+    } else {
+      cDot.className = 'dot green'; cStatus.textContent = 'Claude: ready';
+    }
+  } catch(e) {
+    document.getElementById('claude-status').textContent = 'Claude: server offline';
+  }
+}
+
+function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.hash.replace('#','?'));
+  const token = params.get('access_token');
+  if (token) {
+    accessToken = token;
+    localStorage.setItem('gh_access_token', token);
+    history.replaceState(null,'',window.location.pathname);
+    updateBadges(); showPage('data');
+  }
+}
+
+function updateBadges() {
+  const gDot = document.getElementById('google-dot');
+  const gStatus = document.getElementById('google-status');
+  const discBtn = document.getElementById('btn-disconnect-google');
+  if (accessToken) { gDot.className='dot green'; gStatus.textContent='Google: connected'; if(discBtn) discBtn.style.display='inline-flex'; }
+  else { gDot.style.background='var(--muted)'; gStatus.textContent='Google: not connected'; if(discBtn) discBtn.style.display='none'; }
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{ if(n.getAttribute('onclick').includes("'"+id+"'")) n.classList.add('active'); });
+}
+
+function startGoogleAuth() {
+  const clientId = document.getElementById('gClientId').value.trim();
+  if (!clientId) { showAlert('google-auth-status','error','Enter your Client ID first.'); return; }
+  localStorage.setItem('gh_client_id', clientId);
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=${encodeURIComponent(SCOPES)}&access_type=online`;
+  window.location.href = url;
+}
+
+function disconnectGoogle() {
+  accessToken=null; healthData=null;
+  localStorage.removeItem('gh_access_token'); localStorage.removeItem('gh_health_data');
+  updateBadges(); showAlert('google-auth-status','info','Disconnected.');
+}
+
+async function fetchAllData() {
+  if (!accessToken) { alert('Connect Google Health first.'); showPage('setup'); return; }
+  const btn = document.getElementById('btn-refresh');
+  btn.innerHTML='<span class="spinner"></span> Loading...'; btn.disabled=true;
+  const today = new Date().toISOString().split('T')[0];
+  const yest = new Date(Date.now()-86400000).toISOString().split('T')[0];
+  const eps = [
+    {key:'steps',path:'steps',f:`steps.interval.civil_start_time >= "${today}T00:00:00"`},
+    {key:'calories',path:'calories',f:`calories.interval.civil_start_time >= "${today}T00:00:00"`},
+    {key:'heart_rate',path:'heart_rate',f:`heart_rate.interval.civil_start_time >= "${yest}T00:00:00"`},
+    {key:'sleep',path:'sleep',f:`sleep.interval.civil_start_time >= "${yest}T00:00:00"`},
+    {key:'spo2',path:'spo2',f:`spo2.interval.civil_start_time >= "${yest}T00:00:00"`},
+    {key:'hrv',path:'heart_rate_variability_rmssd',f:`heart_rate_variability_rmssd.interval.civil_start_time >= "${yest}T00:00:00"`},
+  ];
+  const results={}; allDataPoints=[];
+  for (const ep of eps) {
+    try {
+      const url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints?filter=${encodeURIComponent(ep.f)}`;
+      const res=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`}});
+      if(res.ok){ const d=await res.json(); results[ep.key]=d.dataPoints||[]; (d.dataPoints||[]).forEach(dp=>allDataPoints.push({type:ep.key,raw:dp})); }
+      else if(res.status===401){ accessToken=null; localStorage.removeItem('gh_access_token'); updateBadges(); alert('Session expired. Reconnect Google Health.'); showPage('setup'); return; }
+    } catch(e){ results[ep.key]=[]; }
+  }
+  healthData=results; localStorage.setItem('gh_health_data',JSON.stringify(healthData));
+  renderMetrics(healthData); renderTable();
+  document.getElementById('spo2-note').style.display='block';
+  btn.innerHTML='↻ Refresh Data'; btn.disabled=false;
+}
+
+const sumSteps=p=>p.reduce((a,x)=>a+parseInt(x.steps?.count||0),0);
+const avgHR=p=>{const v=p.map(x=>x.heart_rate?.bpm).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
+const totalSleep=p=>{if(!p.length)return null;const t=p.reduce((a,x)=>a+(new Date(x.sleep?.interval?.endTime)-new Date(x.sleep?.interval?.startTime)),0);return(t/3600000).toFixed(1);};
+const avgSpo2=p=>{const v=p.map(x=>x.spo2?.percentage).filter(Boolean);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null;};
+const sumCal=p=>Math.round(p.reduce((a,x)=>a+parseFloat(x.calories?.kcal||0),0));
+const avgHrv=p=>{const v=p.map(x=>x.heart_rate_variability_rmssd?.milliseconds).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
+
+function renderMetrics(d){
+  const steps=sumSteps(d.steps||[]), hr=avgHR(d.heart_rate||[]), sleep=totalSleep(d.sleep||[]), spo2=avgSpo2(d.spo2||[]), cal=sumCal(d.calories||[]), hrv=avgHrv(d.hrv||[]);
+  document.getElementById('m-steps').textContent=steps?steps.toLocaleString():'—';
+  document.getElementById('m-hr').innerHTML=hr?`${hr}<span class="metric-unit">bpm</span>`:'—';
+  document.getElementById('m-sleep').innerHTML=sleep?`${sleep}<span class="metric-unit">hrs</span>`:'—';
+  document.getElementById('m-spo2').innerHTML=spo2?`${spo2}<span class="metric-unit">%</span>`:'—';
+  document.getElementById('m-cal').textContent=cal?cal.toLocaleString():'—';
+  document.getElementById('m-hrv').innerHTML=hrv?`${hrv}<span class="metric-unit">ms</span>`:'—';
+}
+
+function renderTable(){
+  const filter=document.getElementById('data-type-filter').value;
+  const c=document.getElementById('data-table-container');
+  const pts=filter==='all'?allDataPoints:allDataPoints.filter(p=>p.type===filter);
+  if(!pts.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div>No data points found.</div>';return;}
+  const rows=pts.slice(0,60).map(p=>{
+    const t=p.type,raw=p.raw;
+    const time=raw[t]?.interval?.startTime?new Date(raw[t].interval.startTime).toLocaleString():'—';
+    let v='—';
+    if(t==='steps')v=raw.steps?.count+' steps';
+    else if(t==='heart_rate')v=raw.heart_rate?.bpm+' bpm';
+    else if(t==='sleep'){const s=new Date(raw.sleep?.interval?.startTime),e=new Date(raw.sleep?.interval?.endTime);v=((e-s)/3600000).toFixed(1)+' hrs';}
+    else if(t==='spo2')v=raw.spo2?.percentage?.toFixed(1)+'%';
+    else if(t==='calories')v=raw.calories?.kcal?.toFixed(1)+' kcal';
+    else if(t==='hrv')v=raw.heart_rate_variability_rmssd?.milliseconds?.toFixed(1)+' ms';
+    const tc=t==='heart_rate'?'heart':t==='spo2'?'spo2':t==='sleep'?'sleep':'activity';
+    return `<tr><td>${time}</td><td><span class="tag ${tc}">${t.replace(/_/g,' ')}</span></td><td class="mono">${v}</td></tr>`;
+  }).join('');
+  c.innerHTML=`<table class="data-table"><thead><tr><th>Time</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function buildContext(){
+  if(!healthData)return 'No health data loaded yet.';
+  return `User's Fitbit Air data (today):
+- Steps: ${sumSteps(healthData.steps||[])||'no data'}
+- Resting HR: ${avgHR(healthData.heart_rate||[])||'no data'} bpm
+- Sleep last night: ${totalSleep(healthData.sleep||[])||'no data'} hrs
+- SpO2 avg: ${avgSpo2(healthData.spo2||[])||'no data'}%
+- Calories: ${sumCal(healthData.calories||[])||'no data'}
+- HRV: ${avgHrv(healthData.hrv||[])||'no data'} ms
+
+Use this to answer health questions. This is wellness data, not medical advice.`;
+}
+
+function quickPrompt(t){ document.getElementById('chat-input').value=t; sendMessage(); }
+
+async function sendMessage(){
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim(); if(!msg)return;
+  input.value=''; appendMsg('user',msg);
+  const btn=document.getElementById('btn-send'); btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
+  chatHistory.push({role:'user',content:msg});
+  const system=`You are a personal health assistant with access to the user's Fitbit Air data:\n\n${buildContext()}\n\nBe concise, warm, helpful. Not medical advice for serious concerns.`;
+  try {
+    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages:chatHistory,max_tokens:1024})});
+    const data=await res.json();
+    if(data.content?.[0]?.text){ const r=data.content[0].text; chatHistory.push({role:'assistant',content:r}); appendMsg('assistant',r); }
+    else if(data.error){ appendMsg('assistant',`Error: ${data.error.message||data.error}`); }
+  } catch(e){ appendMsg('assistant',`Connection error: ${e.message}`); }
+  btn.innerHTML='Send'; btn.disabled=false;
+}
+
+function appendMsg(role,text){
+  const box=document.getElementById('chat-box');
+  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const label=role==='user'?'You':'Claude';
+  const div=document.createElement('div'); div.className=`msg ${role}`;
+  div.innerHTML=`<div class="bubble">${esc(text)}</div><div class="msg-meta">${label} · ${now}</div>`;
+  box.appendChild(div); box.scrollTop=box.scrollHeight;
+}
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+function showAlert(id,type,msg){const el=document.getElementById(id);if(!el)return;el.innerHTML=`<div class="alert ${type}">${msg}</div>`;setTimeout(()=>{if(el)el.innerHTML='';},5000);}
+</script>
+</body>
+</html>

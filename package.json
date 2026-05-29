@@ -1,0 +1,10 @@
+{
+  "name": "health-claude",
+  "version": "1.0.0",
+  "description": "Connect your Fitbit Air / Google Health data to Claude",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  }
+}
