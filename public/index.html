@@ -345,20 +345,23 @@ async function fetchAllData() {
   btn.innerHTML='<span class="spinner"></span> Loading...'; btn.disabled=true;
   const today = new Date().toISOString().split('T')[0];
   const yest = new Date(Date.now()-86400000).toISOString().split('T')[0];
-  // Data type identifier is snake_case and is identical in the URL path and the filter field prefix.
-  // Interval types filter on .interval.civil_start_time; Sample types filter on .sample_time.physical_time
+  // Per Google's spec the {dataType} in the URL path is the KEBAB-CASE form of the union field name
+  // (e.g. total-calories for totalCalories). The filter field prefix is the SNAKE_CASE form.
+  // Interval types filter on .interval.start_time (RFC-3339) or .interval.civil_start_time (ISO date).
+  // Sample types filter on .sample_time.physical_time. Daily summary types only carry a {date} and are
+  // not filterable by those members, so we omit the filter and pick the most recent point client-side.
   const eps = [
-    {key:'steps',          path:'steps',                        f:`steps.interval.civil_start_time >= "${today}T00:00:00"`},
-    {key:'calories',       path:'total_calories',               f:`total_calories.interval.civil_start_time >= "${today}T00:00:00"`},
-    {key:'heart_rate',     path:'heart_rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
-    {key:'sleep',          path:'sleep',                        f:`sleep.interval.civil_start_time >= "${yest}T00:00:00"`},
-    {key:'spo2',           path:'daily_oxygen_saturation',      f:`daily_oxygen_saturation.interval.civil_start_time >= "${yest}T00:00:00"`},
-    {key:'hrv',            path:'daily_heart_rate_variability', f:`daily_heart_rate_variability.interval.civil_start_time >= "${yest}T00:00:00"`},
+    {key:'steps',      path:'steps',                        f:`steps.interval.civil_start_time >= "${today}"`},
+    {key:'calories',   path:'total-calories',               f:`total_calories.interval.civil_start_time >= "${today}"`},
+    {key:'heart_rate', path:'heart-rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
+    {key:'sleep',      path:'sleep',                        f:`sleep.interval.start_time >= "${yest}T00:00:00Z"`},
+    {key:'spo2',       path:'daily-oxygen-saturation',      f:null},
+    {key:'hrv',        path:'daily-heart-rate-variability', f:null},
   ];
   const results={}; allDataPoints=[]; const errors=[];
   for (const ep of eps) {
     try {
-      const url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints?filter=${encodeURIComponent(ep.f)}`;
+      const url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints`+(ep.f?`?filter=${encodeURIComponent(ep.f)}`:'');
       const res=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'}});
       if(res.ok){ const d=await res.json(); results[ep.key]=d.dataPoints||[]; (d.dataPoints||[]).forEach(dp=>allDataPoints.push({type:ep.key,raw:dp})); }
       else if(res.status===401){ accessToken=null; localStorage.removeItem('gh_access_token'); updateBadges(); alert('Session expired. Reconnect Google Health.'); showPage('setup'); return; }
