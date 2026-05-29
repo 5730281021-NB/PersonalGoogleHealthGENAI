@@ -137,6 +137,25 @@
   .mono { font-family: 'DM Mono', monospace; }
   .copy-field { display: flex; gap: 8px; align-items: center; }
   .copy-field code { flex: 1; padding: 8px 12px; }
+  /* Trend charts */
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1rem; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem 0.6rem; position: relative; }
+  .chart-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+  .chart-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .chart-title { font-size: 14px; font-weight: 500; }
+  .chart-latest { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 19px; font-weight: 300; color: var(--text); }
+  .chart-unit { font-size: 12px; color: var(--muted); margin-left: 3px; }
+  .chart-body { position: relative; }
+  .line-chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .line-chart .grid-line { stroke: rgba(255,255,255,0.05); stroke-width: 1; }
+  .line-chart .axis-label { fill: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; }
+  .line-chart .hover-overlay { cursor: crosshair; }
+  .chart-empty { padding: 2.5rem 1rem; text-align: center; color: var(--muted); font-size: 13px; }
+  .chart-tip { position: absolute; transform: translate(-50%, -100%); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 5px 10px; pointer-events: none; transition: opacity 0.12s; white-space: nowrap; z-index: 5; display: flex; flex-direction: column; gap: 1px; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+  .chart-tip strong { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; }
+  .chart-tip span { font-size: 11px; color: var(--muted); }
+  .chart-marker { position: absolute; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bg); transform: translate(-50%,-50%); pointer-events: none; opacity: 0; transition: opacity 0.12s; z-index: 4; }
+  .chart-vline { position: absolute; top: 0; width: 1px; background: rgba(255,255,255,0.18); pointer-events: none; opacity: 0; transition: opacity 0.12s; }
 </style>
 </head>
 <body>
@@ -202,6 +221,14 @@
         <div class="metric-card"><div class="metric-label">HRV</div><div class="metric-value" id="m-hrv">—<span class="metric-unit">ms</span></div></div>
       </div>
       <div class="alert warn" id="spo2-note" style="display:none">⚠ SpO2 &amp; breathing rate may show no data in Thailand — these features are regionally restricted by Google.</div>
+      <div class="card" id="trends-card" style="display:none">
+        <div class="flex-row" style="margin-bottom:1.25rem;">
+          <h2 style="margin-bottom:0;">Trends</h2>
+          <div class="spacer"></div>
+          <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">one line per data type</span>
+        </div>
+        <div class="chart-grid" id="chart-grid"></div>
+      </div>
       <div class="card">
         <div class="flex-row" style="margin-bottom:1rem;">
           <h2 style="margin-bottom:0;">Recent data points</h2>
@@ -275,7 +302,12 @@ window.onload = () => {
   handleOAuthCallback();
   checkClaude();
   updateBadges();
-  if (healthData) { renderMetrics(healthData); document.getElementById('spo2-note').style.display='block'; }
+  if (healthData) {
+    allDataPoints=[];
+    Object.keys(healthData).forEach(k=>(healthData[k]||[]).forEach(dp=>allDataPoints.push({type:k,raw:dp})));
+    renderMetrics(healthData); renderTable(); renderCharts();
+    document.getElementById('spo2-note').style.display='block';
+  }
 };
 
 function copyRedirect() {
@@ -379,7 +411,7 @@ async function fetchAllData() {
   }
   if(errors.length){ console.log('Health API issues (some may be expected, e.g. SpO2 in Thailand):',errors); }
   healthData=results; localStorage.setItem('gh_health_data',JSON.stringify(healthData));
-  renderMetrics(healthData); renderTable();
+  renderMetrics(healthData); renderTable(); renderCharts();
   document.getElementById('spo2-note').style.display='block';
   btn.innerHTML='↻ Refresh Data'; btn.disabled=false;
 }
@@ -424,6 +456,137 @@ function renderTable(){
     return `<tr><td>${time}</td><td><span class="tag ${tc}">${t.replace(/_/g,' ')}</span></td><td class="mono">${v}</td></tr>`;
   }).join('');
   c.innerHTML=`<table class="data-table"><thead><tr><th>Time</th><th>Type</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ---- Trend line charts ----------------------------------------------------
+// Each series: extract sorted {t: Date, y: number} points from a raw data array.
+const CHART_SERIES = [
+  { key:'steps',      label:'Steps',          unit:'',     color:'var(--accent)', fmt:v=>Math.round(v).toLocaleString(),
+    pick:p=>({ t:tsOf(p.steps?.interval), y:parseInt(p.steps?.count||0) }) },
+  { key:'heart_rate', label:'Heart Rate',     unit:'bpm',  color:'var(--danger)', fmt:v=>Math.round(v),
+    pick:p=>({ t:tsOf(p.heartRate?.sampleTime), y:parseInt(p.heartRate?.beatsPerMinute) }) },
+  { key:'calories',   label:'Calories',       unit:'kcal', color:'var(--warn)',   fmt:v=>Math.round(v).toLocaleString(),
+    pick:p=>({ t:tsOf(p.civilStartTime||p.totalCalories?.interval), y:parseFloat(p.totalCalories?.kcalSum ?? p.totalCalories?.energy?.kcal ?? p.totalCalories?.kcal) }) },
+  { key:'sleep',      label:'Sleep Duration', unit:'hrs',  color:'var(--blue)',   fmt:v=>v.toFixed(1),
+    pick:p=>({ t:tsOf(p.sleep?.interval), y:(new Date(p.sleep?.interval?.endTime)-new Date(p.sleep?.interval?.startTime))/3600000 }) },
+  { key:'spo2',       label:'SpO2',           unit:'%',    color:'var(--warn)',   fmt:v=>v.toFixed(1),
+    pick:p=>({ t:dateOf(p.dailyOxygenSaturation?.date), y:p.dailyOxygenSaturation?.averagePercentage }) },
+  { key:'hrv',        label:'HRV',            unit:'ms',   color:'var(--accent)', fmt:v=>Math.round(v),
+    pick:p=>({ t:dateOf(p.dailyHeartRateVariability?.date), y:p.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds }) },
+];
+function tsOf(o){ if(!o)return null; const s=o.startTime||o.physicalTime||(o.date?dateOf(o.date):null); return s?new Date(s):null; }
+function dateOf(d){ return d?new Date(d.year,(d.month||1)-1,d.day||1):null; }
+
+function seriesPoints(cfg){
+  const raw=(healthData&&healthData[cfg.key])||[];
+  return raw.map(cfg.pick)
+    .filter(p=>p.t instanceof Date && !isNaN(p.t) && typeof p.y==='number' && !isNaN(p.y))
+    .sort((a,b)=>a.t-b.t);
+}
+
+function renderCharts(){
+  const grid=document.getElementById('chart-grid');
+  const wrap=document.getElementById('trends-card');
+  if(!grid||!wrap)return;
+  let any=false;
+  grid.innerHTML=CHART_SERIES.map(cfg=>{
+    const pts=seriesPoints(cfg);
+    if(pts.length)any=true;
+    return chartCard(cfg,pts);
+  }).join('');
+  wrap.style.display=any?'block':'none';
+  CHART_SERIES.forEach(cfg=>attachHover(cfg));
+}
+
+function chartCard(cfg,pts){
+  const latest=pts.length?cfg.fmt(pts[pts.length-1].y):'—';
+  const body=pts.length>=2 ? lineSvg(cfg,pts)
+    : pts.length===1 ? `<div class="chart-empty">Only one reading so far — the line builds as more data arrives.</div>`
+    : `<div class="chart-empty">No data points yet.</div>`;
+  return `<div class="chart-card" data-key="${cfg.key}">
+    <div class="chart-head">
+      <span class="chart-dot" style="background:${cfg.color};box-shadow:0 0 6px ${cfg.color}"></span>
+      <span class="chart-title">${cfg.label}</span>
+      <span class="chart-latest">${latest}<span class="chart-unit">${cfg.unit}</span></span>
+    </div>
+    <div class="chart-body">${body}
+      <div class="chart-vline"></div><div class="chart-marker" style="background:${cfg.color}"></div>
+      <div class="chart-tip" style="opacity:0"></div>
+    </div>
+  </div>`;
+}
+
+function lineSvg(cfg,pts){
+  const W=380,H=150, padL=38,padR=12,padT=14,padB=24;
+  const xs=pts.map(p=>p.t.getTime()), ys=pts.map(p=>p.y);
+  const xMin=Math.min(...xs), xMax=Math.max(...xs);
+  let yMin=Math.min(...ys), yMax=Math.max(...ys);
+  if(yMin===yMax){ yMin-=1; yMax+=1; } else { const pad=(yMax-yMin)*0.12; yMin-=pad; yMax+=pad; }
+  const px=t=>padL+((t-xMin)/((xMax-xMin)||1))*(W-padL-padR);
+  const py=v=>padT+(1-(v-yMin)/((yMax-yMin)||1))*(H-padT-padB);
+  const coords=pts.map(p=>[px(p.t.getTime()),py(p.y)]);
+  const line=coords.map((c,i)=>(i?'L':'M')+c[0].toFixed(1)+' '+c[1].toFixed(1)).join(' ');
+  const area=`${line} L ${coords[coords.length-1][0].toFixed(1)} ${H-padB} L ${coords[0][0].toFixed(1)} ${H-padB} Z`;
+  // y gridlines + labels (3 ticks)
+  let grid='';
+  for(let i=0;i<3;i++){ const val=yMin+(yMax-yMin)*(i/2); const y=py(val);
+    grid+=`<line class="grid-line" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>`+
+          `<text class="axis-label" x="${padL-6}" y="${(y+3).toFixed(1)}" text-anchor="end">${cfg.fmt(val)}</text>`; }
+  // x labels (first / last)
+  const xlab=(t,anchor,x)=>`<text class="axis-label" x="${x}" y="${H-6}" text-anchor="${anchor}">${shortTime(new Date(t))}</text>`;
+  const gid='grad-'+cfg.key;
+  return `<svg class="line-chart" viewBox="0 0 ${W} ${H}" data-w="${W}" data-h="${H}" data-padl="${padL}" data-padr="${padR}">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${cfg.color}" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="${cfg.color}" stop-opacity="0"/>
+    </linearGradient></defs>
+    ${grid}
+    <path d="${area}" fill="url(#${gid})"/>
+    <path d="${line}" fill="none" stroke="${cfg.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${xlab(xMin,'start',padL)}${xlab(xMax,'end',W-padR)}
+  </svg>`;
+}
+
+function shortTime(d){
+  const sameDay=(new Date()-d)<86400000;
+  return sameDay ? d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
+                 : d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
+
+function attachHover(cfg){
+  const card=document.querySelector(`.chart-card[data-key="${cfg.key}"]`);
+  if(!card)return;
+  const svg=card.querySelector('.line-chart'); if(!svg)return;
+  const pts=seriesPoints(cfg); if(pts.length<2)return;
+  const body=card.querySelector('.chart-body');
+  const tip=card.querySelector('.chart-tip');
+  const marker=card.querySelector('.chart-marker');
+  const vline=card.querySelector('.chart-vline');
+  // recompute exact viewBox coordinates for each point (mirrors lineSvg)
+  const W=+svg.dataset.w, H=+svg.dataset.h, padL=+svg.dataset.padl, padR=+svg.dataset.padr, padT=14, padB=24;
+  const xs=pts.map(p=>p.t.getTime()), ys=pts.map(p=>p.y);
+  const xMin=Math.min(...xs), xMax=Math.max(...xs);
+  let yMin=Math.min(...ys), yMax=Math.max(...ys);
+  if(yMin===yMax){ yMin-=1; yMax+=1; } else { const pad=(yMax-yMin)*0.12; yMin-=pad; yMax+=pad; }
+  const vbX=t=>padL+((t-xMin)/((xMax-xMin)||1))*(W-padL-padR);
+  const vbY=v=>padT+(1-(v-yMin)/((yMax-yMin)||1))*(H-padT-padB);
+  const move=e=>{
+    const r=svg.getBoundingClientRect();
+    const relX=Math.min(Math.max(e.clientX-r.left,0),r.width);
+    const tTarget=xMin+((relX/r.width*W-padL)/((W-padL-padR)||1))*((xMax-xMin)||1);
+    let nearest=pts[0],bd=Infinity;
+    pts.forEach(p=>{const dd=Math.abs(p.t.getTime()-tTarget); if(dd<bd){bd=dd;nearest=p;}});
+    // viewBox → pixels (preserveAspectRatio="none" → linear on each axis)
+    const xPx=vbX(nearest.t.getTime())/W*r.width;
+    const yPx=vbY(nearest.y)/H*r.height;
+    marker.style.left=xPx+'px'; marker.style.top=yPx+'px'; marker.style.opacity=1;
+    vline.style.left=xPx+'px'; vline.style.height=r.height+'px'; vline.style.opacity=1;
+    tip.style.left=Math.min(Math.max(xPx,44),r.width-44)+'px'; tip.style.top=(yPx-12)+'px'; tip.style.opacity=1;
+    tip.innerHTML=`<strong>${cfg.fmt(nearest.y)} ${cfg.unit}</strong><span>${nearest.t.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>`;
+  };
+  const hide=()=>{ marker.style.opacity=0; vline.style.opacity=0; tip.style.opacity=0; };
+  body.addEventListener('mousemove',move);
+  body.addEventListener('mouseleave',hide);
 }
 
 function buildContext(){
