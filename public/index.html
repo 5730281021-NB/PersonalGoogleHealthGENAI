@@ -345,15 +345,15 @@ async function fetchAllData() {
   btn.innerHTML='<span class="spinner"></span> Loading...'; btn.disabled=true;
   const today = new Date().toISOString().split('T')[0];
   const yest = new Date(Date.now()-86400000).toISOString().split('T')[0];
-  // URL path = kebab-case, filter field = snake_case (Google requirement)
-  // Interval types filter on .interval.civil_start_time; Sample/Daily types filter on .sample_time.physical_time
+  // Data type identifier is snake_case and is identical in the URL path and the filter field prefix.
+  // Interval types filter on .interval.civil_start_time; Sample types filter on .sample_time.physical_time
   const eps = [
     {key:'steps',          path:'steps',                        f:`steps.interval.civil_start_time >= "${today}T00:00:00"`},
-    {key:'calories',       path:'total-calories',               f:`total_calories.interval.civil_start_time >= "${today}T00:00:00"`},
-    {key:'heart_rate',     path:'heart-rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
+    {key:'calories',       path:'total_calories',               f:`total_calories.interval.civil_start_time >= "${today}T00:00:00"`},
+    {key:'heart_rate',     path:'heart_rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
     {key:'sleep',          path:'sleep',                        f:`sleep.interval.civil_start_time >= "${yest}T00:00:00"`},
-    {key:'spo2',           path:'daily-oxygen-saturation',      f:`daily_oxygen_saturation.civil_date >= "${yest}"`},
-    {key:'hrv',            path:'daily-heart-rate-variability', f:`daily_heart_rate_variability.civil_date >= "${yest}"`},
+    {key:'spo2',           path:'daily_oxygen_saturation',      f:`daily_oxygen_saturation.interval.civil_start_time >= "${yest}T00:00:00"`},
+    {key:'hrv',            path:'daily_heart_rate_variability', f:`daily_heart_rate_variability.interval.civil_start_time >= "${yest}T00:00:00"`},
   ];
   const results={}; allDataPoints=[]; const errors=[];
   for (const ep of eps) {
