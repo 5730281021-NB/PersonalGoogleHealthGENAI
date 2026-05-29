@@ -345,25 +345,34 @@ async function fetchAllData() {
   btn.innerHTML='<span class="spinner"></span> Loading...'; btn.disabled=true;
   const today = new Date().toISOString().split('T')[0];
   const yest = new Date(Date.now()-86400000).toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const toCivil = s=>{const [y,m,d]=s.split('-').map(Number);return {date:{year:y,month:m,day:d}};};
   // Per Google's spec the {dataType} in the URL path is the KEBAB-CASE form of the union field name
   // (e.g. total-calories for totalCalories). The filter field prefix is the SNAKE_CASE form.
-  // Interval types filter on .interval.start_time (RFC-3339) or .interval.civil_start_time (ISO date).
-  // Sample types filter on .sample_time.physical_time. Daily summary types only carry a {date} and are
-  // not filterable by those members, so we omit the filter and pick the most recent point client-side.
+  // - Interval/sample types support the list action with a time filter.
+  // - Session types (sleep) and daily-summary types (spo2, hrv) support list but are NOT filterable, so f:null.
+  // - total-calories does NOT support list at all; it only supports dailyRollUp (POST), so rollup:true.
   const eps = [
     {key:'steps',      path:'steps',                        f:`steps.interval.civil_start_time >= "${today}"`},
-    {key:'calories',   path:'total-calories',               f:`total_calories.interval.civil_start_time >= "${today}"`},
     {key:'heart_rate', path:'heart-rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
-    {key:'sleep',      path:'sleep',                        f:`sleep.interval.start_time >= "${yest}T00:00:00Z"`},
+    {key:'sleep',      path:'sleep',                        f:null},
     {key:'spo2',       path:'daily-oxygen-saturation',      f:null},
     {key:'hrv',        path:'daily-heart-rate-variability', f:null},
+    {key:'calories',   path:'total-calories',               rollup:true, body:{range:{start:toCivil(today),end:toCivil(tomorrow)}}},
   ];
   const results={}; allDataPoints=[]; const errors=[];
   for (const ep of eps) {
     try {
-      const url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints`+(ep.f?`?filter=${encodeURIComponent(ep.f)}`:'');
-      const res=await fetch(url,{headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'}});
-      if(res.ok){ const d=await res.json(); results[ep.key]=d.dataPoints||[]; (d.dataPoints||[]).forEach(dp=>allDataPoints.push({type:ep.key,raw:dp})); }
+      let url, opts;
+      if(ep.rollup){
+        url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints:dailyRollUp`;
+        opts={method:'POST',headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(ep.body)};
+      } else {
+        url=`https://health.googleapis.com/v4/users/me/dataTypes/${ep.path}/dataPoints`+(ep.f?`?filter=${encodeURIComponent(ep.f)}`:'');
+        opts={headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/json'}};
+      }
+      const res=await fetch(url,opts);
+      if(res.ok){ const d=await res.json(); const pts=d.dataPoints||d.rollupDataPoints||[]; results[ep.key]=pts; pts.forEach(dp=>allDataPoints.push({type:ep.key,raw:dp})); }
       else if(res.status===401){ accessToken=null; localStorage.removeItem('gh_access_token'); updateBadges(); alert('Session expired. Reconnect Google Health.'); showPage('setup'); return; }
       else { const errText=await res.text(); console.warn(`${ep.key} → ${res.status}:`,errText); errors.push(`${ep.key}: ${res.status}`); results[ep.key]=[]; }
     } catch(e){ console.warn(`${ep.key} fetch failed:`,e); errors.push(`${ep.key}: ${e.message}`); results[ep.key]=[]; }
@@ -379,7 +388,7 @@ const sumSteps=p=>p.reduce((a,x)=>a+parseInt(x.steps?.count||0),0);
 const avgHR=p=>{const v=p.map(x=>parseInt(x.heartRate?.beatsPerMinute)).filter(Boolean);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
 const totalSleep=p=>{if(!p.length)return null;const t=p.reduce((a,x)=>a+(new Date(x.sleep?.interval?.endTime)-new Date(x.sleep?.interval?.startTime)),0);return(t/3600000).toFixed(1);};
 const avgSpo2=p=>{const v=p.map(x=>x.dailyOxygenSaturation?.averagePercentage).filter(v=>typeof v==='number');return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null;};
-const sumCal=p=>Math.round(p.reduce((a,x)=>a+parseFloat(x.totalCalories?.energy?.kcal||x.totalCalories?.kcal||0),0));
+const sumCal=p=>Math.round(p.reduce((a,x)=>a+parseFloat(x.totalCalories?.kcalSum||x.totalCalories?.energy?.kcal||x.totalCalories?.kcal||0),0));
 const avgHrv=p=>{const v=p.map(x=>x.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds).filter(v=>typeof v==='number');return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):null;};
 
 function renderMetrics(d){
@@ -402,13 +411,14 @@ function renderTable(){
     // figure out the data object key inside the raw point
     const obj=raw.steps||raw.heartRate||raw.sleep||raw.totalCalories||raw.dailyOxygenSaturation||raw.dailyHeartRateVariability||{};
     const ts=obj.interval?.startTime||obj.sampleTime?.physicalTime||null;
-    const time=ts?new Date(ts).toLocaleString():(obj.date?`${obj.date.year}-${obj.date.month}-${obj.date.day}`:'—');
+    const civil=raw.civilStartTime?.date||obj.date;
+    const time=ts?new Date(ts).toLocaleString():(civil?`${civil.year}-${civil.month}-${civil.day}`:'—');
     let v='—';
     if(t==='steps')v=(raw.steps?.count||0)+' steps';
     else if(t==='heart_rate')v=(raw.heartRate?.beatsPerMinute||0)+' bpm';
     else if(t==='sleep'){const s=new Date(raw.sleep?.interval?.startTime),e=new Date(raw.sleep?.interval?.endTime);v=((e-s)/3600000).toFixed(1)+' hrs';}
     else if(t==='spo2')v=(raw.dailyOxygenSaturation?.averagePercentage||0).toFixed(1)+'%';
-    else if(t==='calories')v=(raw.totalCalories?.energy?.kcal||raw.totalCalories?.kcal||0).toFixed(1)+' kcal';
+    else if(t==='calories')v=(raw.totalCalories?.kcalSum||raw.totalCalories?.energy?.kcal||raw.totalCalories?.kcal||0).toFixed(1)+' kcal';
     else if(t==='hrv')v=(raw.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds||0).toFixed(1)+' ms';
     const tc=t==='heart_rate'?'heart':t==='spo2'?'spo2':t==='sleep'?'sleep':'activity';
     return `<tr><td>${time}</td><td><span class="tag ${tc}">${t.replace(/_/g,' ')}</span></td><td class="mono">${v}</td></tr>`;
