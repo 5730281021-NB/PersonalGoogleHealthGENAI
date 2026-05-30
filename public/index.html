@@ -289,6 +289,17 @@ let chatHistory = [];
 let allDataPoints = [];
 const REDIRECT_URI = window.location.origin;
 
+// ---- Timezone: everything is computed & displayed in UTC+7 (Asia/Bangkok) ----
+// regardless of the browser's local timezone.
+const TZ = 'Asia/Bangkok';
+const TZ_OFFSET_MS = 7 * 3600000;
+// Calendar date (YYYY-MM-DD) of an instant, as seen in UTC+7. Host-timezone independent.
+function ymdTZ(d=new Date()){ return new Date(d.getTime()+TZ_OFFSET_MS).toISOString().split('T')[0]; }
+// Display helpers (force the Asia/Bangkok zone so output is identical on any machine).
+function fmtDateTimeTZ(d){ return new Date(d).toLocaleString('en-GB',{timeZone:TZ,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}); }
+function fmtTimeTZ(d){ return new Date(d).toLocaleTimeString('en-GB',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:false}); }
+function fmtDayTZ(d){ return new Date(d).toLocaleDateString('en-GB',{timeZone:TZ,day:'numeric',month:'short'}); }
+
 const SCOPES = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
@@ -375,9 +386,9 @@ async function fetchAllData() {
   if (!accessToken) { alert('Connect Google Health first.'); showPage('setup'); return; }
   const btn = document.getElementById('btn-refresh');
   btn.innerHTML='<span class="spinner"></span> Loading...'; btn.disabled=true;
-  const today = new Date().toISOString().split('T')[0];
-  const yest = new Date(Date.now()-86400000).toISOString().split('T')[0];
-  const tomorrow = new Date(Date.now()+86400000).toISOString().split('T')[0];
+  const today = ymdTZ();
+  const yest = ymdTZ(new Date(Date.now()-86400000));
+  const tomorrow = ymdTZ(new Date(Date.now()+86400000));
   const toCivil = s=>{const [y,m,d]=s.split('-').map(Number);return {date:{year:y,month:m,day:d}};};
   // Per Google's spec the {dataType} in the URL path is the KEBAB-CASE form of the union field name
   // (e.g. total-calories for totalCalories). The filter field prefix is the SNAKE_CASE form.
@@ -386,7 +397,7 @@ async function fetchAllData() {
   // - total-calories does NOT support list at all; it only supports dailyRollUp (POST), so rollup:true.
   const eps = [
     {key:'steps',      path:'steps',                        f:`steps.interval.civil_start_time >= "${today}"`},
-    {key:'heart_rate', path:'heart-rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00Z"`},
+    {key:'heart_rate', path:'heart-rate',                   f:`heart_rate.sample_time.physical_time >= "${yest}T00:00:00+07:00"`},
     {key:'sleep',      path:'sleep',                        f:null},
     {key:'spo2',       path:'daily-oxygen-saturation',      f:null},
     {key:'hrv',        path:'daily-heart-rate-variability', f:null},
@@ -444,7 +455,7 @@ function renderTable(){
     const obj=raw.steps||raw.heartRate||raw.sleep||raw.totalCalories||raw.dailyOxygenSaturation||raw.dailyHeartRateVariability||{};
     const ts=obj.interval?.startTime||obj.sampleTime?.physicalTime||null;
     const civil=raw.civilStartTime?.date||obj.date;
-    const time=ts?new Date(ts).toLocaleString():(civil?`${civil.year}-${civil.month}-${civil.day}`:'—');
+    const time=ts?fmtDateTimeTZ(ts):(civil?`${civil.year}-${String(civil.month).padStart(2,'0')}-${String(civil.day).padStart(2,'0')}`:'—');
     let v='—';
     if(t==='steps')v=(raw.steps?.count||0)+' steps';
     else if(t==='heart_rate')v=(raw.heartRate?.beatsPerMinute||0)+' bpm';
@@ -475,7 +486,8 @@ const CHART_SERIES = [
     pick:p=>({ t:dateOf(p.dailyHeartRateVariability?.date), y:p.dailyHeartRateVariability?.averageHeartRateVariabilityMilliseconds }) },
 ];
 function tsOf(o){ if(!o)return null; const s=o.startTime||o.physicalTime||(o.date?dateOf(o.date):null); return s?new Date(s):null; }
-function dateOf(d){ return d?new Date(d.year,(d.month||1)-1,d.day||1):null; }
+// Build an instant for a civil {year,month,day} at UTC+7 midnight (host-timezone independent).
+function dateOf(d){ if(!d)return null; const iso=`${d.year}-${String(d.month||1).padStart(2,'0')}-${String(d.day||1).padStart(2,'0')}T00:00:00+07:00`; return new Date(iso); }
 
 function seriesPoints(cfg){
   const raw=(healthData&&healthData[cfg.key])||[];
@@ -549,8 +561,7 @@ function lineSvg(cfg,pts){
 
 function shortTime(d){
   const sameDay=(new Date()-d)<86400000;
-  return sameDay ? d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})
-                 : d.toLocaleDateString([],{month:'short',day:'numeric'});
+  return sameDay ? fmtTimeTZ(d) : fmtDayTZ(d);
 }
 
 function attachHover(cfg){
@@ -582,7 +593,7 @@ function attachHover(cfg){
     marker.style.left=xPx+'px'; marker.style.top=yPx+'px'; marker.style.opacity=1;
     vline.style.left=xPx+'px'; vline.style.height=r.height+'px'; vline.style.opacity=1;
     tip.style.left=Math.min(Math.max(xPx,44),r.width-44)+'px'; tip.style.top=(yPx-12)+'px'; tip.style.opacity=1;
-    tip.innerHTML=`<strong>${cfg.fmt(nearest.y)} ${cfg.unit}</strong><span>${nearest.t.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</span>`;
+    tip.innerHTML=`<strong>${cfg.fmt(nearest.y)} ${cfg.unit}</strong><span>${fmtDateTimeTZ(nearest.t)}</span>`;
   };
   const hide=()=>{ marker.style.opacity=0; vline.style.opacity=0; tip.style.opacity=0; };
   body.addEventListener('mousemove',move);
@@ -591,7 +602,7 @@ function attachHover(cfg){
 
 function buildContext(){
   if(!healthData)return 'No health data loaded yet.';
-  const fmtTs=d=>d.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  const fmtTs=d=>fmtDateTimeTZ(d);
   // Evenly downsample to at most `cap` points so large series (e.g. heart rate) stay within token limits.
   const cap=(arr,n)=>{ if(arr.length<=n)return arr; const step=(arr.length-1)/(n-1); return Array.from({length:n},(_,i)=>arr[Math.round(i*step)]); };
   const CAPS={ heart_rate:60, steps:48, calories:31, sleep:31, spo2:31, hrv:31 };
@@ -640,7 +651,7 @@ async function sendMessage(){
 
 function appendMsg(role,text){
   const box=document.getElementById('chat-box');
-  const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const now=fmtTimeTZ(new Date());
   const label=role==='user'?'You':'Gemini';
   const div=document.createElement('div'); div.className=`msg ${role}`;
   div.innerHTML=`<div class="bubble">${esc(text)}</div><div class="msg-meta">${label} · ${now}</div>`;

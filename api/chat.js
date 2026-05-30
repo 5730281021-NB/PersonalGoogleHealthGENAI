@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   try {
     const { system, messages, model, max_tokens } = req.body || {};
-    const useModel = model || process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+    const useModel = model || process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 
     // Map our chat format (role: user|assistant) → Gemini contents (role: user|model).
     const contents = (messages || [])
