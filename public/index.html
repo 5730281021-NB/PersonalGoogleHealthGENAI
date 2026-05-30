@@ -591,15 +591,32 @@ function attachHover(cfg){
 
 function buildContext(){
   if(!healthData)return 'No health data loaded yet.';
-  return `User's Fitbit Air data (today):
-- Steps: ${sumSteps(healthData.steps||[])||'no data'}
-- Resting HR: ${avgHR(healthData.heart_rate||[])||'no data'} bpm
-- Sleep last night: ${totalSleep(healthData.sleep||[])||'no data'} hrs
-- SpO2 avg: ${avgSpo2(healthData.spo2||[])||'no data'}%
-- Calories: ${sumCal(healthData.calories||[])||'no data'}
-- HRV: ${avgHrv(healthData.hrv||[])||'no data'} ms
+  const fmtTs=d=>d.toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+  // Evenly downsample to at most `cap` points so large series (e.g. heart rate) stay within token limits.
+  const cap=(arr,n)=>{ if(arr.length<=n)return arr; const step=(arr.length-1)/(n-1); return Array.from({length:n},(_,i)=>arr[Math.round(i*step)]); };
+  const CAPS={ heart_rate:60, steps:48, calories:31, sleep:31, spo2:31, hrv:31 };
 
-Use this to answer health questions. This is wellness data, not medical advice.`;
+  // Summary block (kept for quick reference)
+  let out=`User's Fitbit Air health data.\n\n=== SUMMARY ===\n`;
+  out+=`- Steps (total today): ${sumSteps(healthData.steps||[])||'no data'}\n`;
+  out+=`- Resting/avg HR: ${avgHR(healthData.heart_rate||[])||'no data'} bpm\n`;
+  out+=`- Sleep last night: ${totalSleep(healthData.sleep||[])||'no data'} hrs\n`;
+  out+=`- SpO2 avg: ${avgSpo2(healthData.spo2||[])||'no data'}%\n`;
+  out+=`- Calories: ${sumCal(healthData.calories||[])||'no data'}\n`;
+  out+=`- HRV: ${avgHrv(healthData.hrv||[])||'no data'} ms\n`;
+
+  // Detailed per-data-point block, one line per reading
+  out+=`\n=== DATA POINTS (timestamp → value) ===\n`;
+  CHART_SERIES.forEach(cfg=>{
+    const pts=cap(seriesPoints(cfg), CAPS[cfg.key]||40);
+    const unit=cfg.unit?` ${cfg.unit}`:'';
+    if(!pts.length){ out+=`\n${cfg.label}: no data\n`; return; }
+    out+=`\n${cfg.label} (${pts.length} point${pts.length>1?'s':''}):\n`;
+    out+=pts.map(p=>`  ${fmtTs(p.t)} → ${cfg.fmt(p.y)}${unit}`).join('\n')+'\n';
+  });
+
+  out+=`\nUse these individual readings to discuss trends, timing, and patterns. This is wellness data, not medical advice.`;
+  return out;
 }
 
 function quickPrompt(t){ document.getElementById('chat-input').value=t; sendMessage(); }
