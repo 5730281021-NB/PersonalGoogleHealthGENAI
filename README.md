@@ -47,6 +47,7 @@ health-gemini/
 ```
 
 ## Notes
+- **Historical data bank** — every time you tap **Refresh Data**, the fetched readings are merged into a real SQLite database (via sql.js/WebAssembly) stored in your browser's IndexedDB. History accumulates across sessions and survives reloads, building a growing personal trend bank. The charts and the Gemini context draw from this full history; the metric cards show today's snapshot (UTC+7). Use **Clear history** on the Health Data page to wipe it. The bank is per-browser/per-device and never leaves your machine.
 - **SpO2 / breathing rate** may return no data in some regions (e.g. Thailand) due to Google's regional restrictions. Steps, HR, sleep, and calories work everywhere.
 - Google Health API v4 is free for personal use. The Gemini API has a free tier — see https://ai.google.dev/gemini-api/docs/rate-limits for current limits.
 - Your data stays between your browser, Google, and your own Vercel function. Nothing is logged or stored externally.
