@@ -1,20 +1,21 @@
-# Health × Claude
+# Health × Gemini
 
-Connect your Fitbit Air / Google Health data to Claude AI. Deployable to Vercel in minutes.
+Connect your Fitbit Air / Google Health data to Google Gemini AI. Deployable to Vercel in minutes.
 
 ## What it does
 - Authenticates with Google Health API v4 (OAuth) to pull your Fitbit Air metrics
 - Displays steps, heart rate, sleep, SpO2, calories, HRV
-- Lets you chat with Claude, which gets your health data as context
-- Keeps your Anthropic API key server-side via a Vercel serverless function
+- Lets you chat with Gemini, which gets your health data as context
+- Keeps your Gemini API key server-side via a Vercel serverless function
 
 ## Deploy to Vercel
 
 1. **Push to GitHub** — upload this folder to a new repo.
 2. **Import to Vercel** — go to https://vercel.com/new and import the repo. No build settings needed.
-3. **Add your Claude key** — in Vercel → Project → Settings → Environment Variables, add:
-   - Key: `ANTHROPIC_API_KEY`
-   - Value: your `sk-ant-...` key
+3. **Add your Gemini key** — get a free key at https://aistudio.google.com/apikey, then in Vercel → Project → Settings → Environment Variables, add:
+   - Key: `GEMINI_API_KEY`
+   - Value: your `AIza...` key
+   - (optional) Key: `GEMINI_MODEL`, Value: e.g. `gemini-2.5-flash-lite` to override the default model
    - Then **redeploy**.
 4. **Note your URL** — e.g. `https://your-project.vercel.app`
 
@@ -33,12 +34,12 @@ Connect your Fitbit Air / Google Health data to Claude AI. Deployable to Vercel 
 npm i -g vercel
 vercel dev
 ```
-Set `ANTHROPIC_API_KEY` locally with `vercel env` or a `.env` file.
+Set `GEMINI_API_KEY` locally with `vercel env` or a `.env` file.
 
 ## File structure
 ```
-health-claude/
-├── api/chat.js        serverless Claude proxy
+health-gemini/
+├── api/chat.js        serverless Gemini proxy
 ├── public/index.html  the app
 ├── vercel.json        config
 ├── package.json
@@ -47,5 +48,5 @@ health-claude/
 
 ## Notes
 - **SpO2 / breathing rate** may return no data in some regions (e.g. Thailand) due to Google's regional restrictions. Steps, HR, sleep, and calories work everywhere.
-- Google Health API v4 is free for personal use. Only the Anthropic API has a (small) per-message cost.
+- Google Health API v4 is free for personal use. The Gemini API has a free tier — see https://ai.google.dev/gemini-api/docs/rate-limits for current limits.
 - Your data stays between your browser, Google, and your own Vercel function. Nothing is logged or stored externally.

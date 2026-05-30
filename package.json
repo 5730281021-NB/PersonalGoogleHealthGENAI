@@ -1,7 +1,7 @@
 {
-  "name": "health-claude",
+  "name": "health-gemini",
   "version": "1.0.0",
-  "description": "Connect your Fitbit Air / Google Health data to Claude",
+  "description": "Connect your Fitbit Air / Google Health data to Google Gemini",
   "private": true,
   "scripts": {
     "dev": "vercel dev",

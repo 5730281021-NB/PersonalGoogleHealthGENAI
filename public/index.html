@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Health × Claude</title>
+<title>Health × Gemini</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -161,16 +161,16 @@
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <div class="logo"><div class="logo-icon">⚕</div> Health × Claude</div>
+    <div class="logo"><div class="logo-icon">⚕</div> Health × Gemini</div>
     <nav class="nav">
       <button class="nav-item active" onclick="showPage('setup')"><span class="nav-icon">⚙</span> Setup</button>
       <button class="nav-item" onclick="showPage('data')"><span class="nav-icon">📊</span> Health Data</button>
-      <button class="nav-item" onclick="showPage('chat')"><span class="nav-icon">💬</span> Ask Claude</button>
+      <button class="nav-item" onclick="showPage('chat')"><span class="nav-icon">💬</span> Ask Gemini</button>
       <button class="nav-item" onclick="showPage('guide')"><span class="nav-icon">📖</span> Guide</button>
     </nav>
     <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px;">
       <div class="status-pill"><div class="dot" id="google-dot" style="background:var(--muted)"></div><span style="font-size:12px;" id="google-status">Google: not connected</span></div>
-      <div class="status-pill"><div class="dot" id="claude-dot" style="background:var(--muted)"></div><span style="font-size:12px;" id="claude-status">Claude: checking...</span></div>
+      <div class="status-pill"><div class="dot" id="gemini-dot" style="background:var(--muted)"></div><span style="font-size:12px;" id="gemini-status">Gemini: checking...</span></div>
     </div>
   </aside>
 
@@ -178,9 +178,9 @@
     <!-- SETUP -->
     <div class="page active" id="page-setup">
       <h1>Setup</h1>
-      <p class="subtitle">Connect your Google Health account. Your Claude API key lives safely on the server.</p>
+      <p class="subtitle">Connect your Google Health account. Your Gemini API key lives safely on the server.</p>
 
-      <div class="alert info">ℹ Your Claude API key is set as a Vercel environment variable — never exposed in the browser. You only need your Google Client ID here.</div>
+      <div class="alert info">ℹ Your Gemini API key is set as a Vercel environment variable — never exposed in the browser. You only need your Google Client ID here.</div>
 
       <div class="card">
         <h2>Your redirect URI</h2>
@@ -247,8 +247,8 @@
 
     <!-- CHAT -->
     <div class="page" id="page-chat">
-      <h1>Ask Claude</h1>
-      <p class="subtitle">Claude has your health data as context and answers questions about it.</p>
+      <h1>Ask Gemini</h1>
+      <p class="subtitle">Gemini has your health data as context and answers questions about it.</p>
       <div class="flex-row" style="margin-bottom:1rem; gap:6px;">
         <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('How did I sleep last night?')">How did I sleep?</button>
         <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('Is my resting heart rate normal?')">Is my HR normal?</button>
@@ -256,7 +256,7 @@
         <button class="btn btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="quickPrompt('Should I work out today based on my recovery?')">Should I work out?</button>
       </div>
       <div class="chat-box" id="chat-box">
-        <div class="msg assistant"><div class="bubble">Hi! I'm Claude. Connect Google Health and fetch your data, then ask me anything about your Fitbit Air metrics.</div><div class="msg-meta">Claude · ready</div></div>
+        <div class="msg assistant"><div class="bubble">Hi! I'm Gemini. Connect Google Health and fetch your data, then ask me anything about your Fitbit Air metrics.</div><div class="msg-meta">Gemini · ready</div></div>
       </div>
       <div class="chat-input-row">
         <input type="text" id="chat-input" placeholder="Ask about your health data..." onkeydown="if(event.key==='Enter')sendMessage()" />
@@ -270,14 +270,14 @@
       <p class="subtitle">From zero to running on Vercel.</p>
       <div class="steps">
         <div class="step"><div class="step-num">1</div><div><div class="step-title">Push to GitHub & import to Vercel</div><div class="step-desc">Upload this folder to a GitHub repo, then go to <a href="https://vercel.com/new" target="_blank">vercel.com/new</a> and import it. Vercel auto-detects the config.</div></div></div>
-        <div class="step"><div class="step-num">2</div><div><div class="step-title">Add your Anthropic key as an env variable</div><div class="step-desc">In Vercel → Project → Settings → Environment Variables, add <code>ANTHROPIC_API_KEY</code> with your <code>sk-ant-...</code> key. Redeploy after adding.</div></div></div>
+        <div class="step"><div class="step-num">2</div><div><div class="step-title">Add your Gemini key as an env variable</div><div class="step-desc">Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>. In Vercel → Project → Settings → Environment Variables, add <code>GEMINI_API_KEY</code> with your <code>AIza...</code> key. Redeploy after adding.</div></div></div>
         <div class="step"><div class="step-num">3</div><div><div class="step-title">Create a Google Cloud project</div><div class="step-desc"><a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → New Project. Enable the <strong>Google Health API</strong> under APIs & Services → Library.</div></div></div>
         <div class="step"><div class="step-num">4</div><div><div class="step-title">Set up OAuth consent + client</div><div class="step-desc">OAuth consent screen → External → add your Gmail as a Test User. Then Credentials → Create OAuth Client ID → Web application. Add your Vercel URL (shown on the Setup page) to Authorized redirect URIs.</div></div></div>
         <div class="step"><div class="step-num">5</div><div><div class="step-title">Add health scopes</div><div class="step-desc">In OAuth consent → Scopes, add <code>googlehealth.activity_and_fitness.readonly</code>, <code>googlehealth.health_metrics_and_measurements.readonly</code>, and <code>googlehealth.sleep.readonly</code>.</div></div></div>
         <div class="step"><div class="step-num">6</div><div><div class="step-title">Connect & go</div><div class="step-desc">Open your deployed site → Setup → paste your Client ID → Connect Google Health → Refresh Data → start chatting.</div></div></div>
       </div>
       <div class="divider"></div>
-      <div class="alert info">ℹ <strong>Security note:</strong> Your Anthropic key stays server-side via the <code>/api/chat</code> serverless function. The browser never sees it.</div>
+      <div class="alert info">ℹ <strong>Security note:</strong> Your Gemini key stays server-side via the <code>/api/chat</code> serverless function. The browser never sees it.</div>
     </div>
   </main>
 </div>
@@ -300,7 +300,7 @@ window.onload = () => {
   const cid = localStorage.getItem('gh_client_id');
   if (cid) document.getElementById('gClientId').value = cid;
   handleOAuthCallback();
-  checkClaude();
+  checkGemini();
   updateBadges();
   if (healthData) {
     allDataPoints=[];
@@ -315,19 +315,19 @@ function copyRedirect() {
   showAlert('google-auth-status','success','✓ Copied redirect URI');
 }
 
-async function checkClaude() {
+async function checkGemini() {
   try {
     const res = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({messages:[{role:'user',content:'ping'}], max_tokens:10}) });
     const data = await res.json();
-    const cDot = document.getElementById('claude-dot');
-    const cStatus = document.getElementById('claude-status');
+    const cDot = document.getElementById('gemini-dot');
+    const cStatus = document.getElementById('gemini-status');
     if (data.error && data.error.includes && data.error.includes('not configured')) {
-      cStatus.textContent = 'Claude: key missing';
+      cStatus.textContent = 'Gemini: key missing';
     } else {
-      cDot.className = 'dot green'; cStatus.textContent = 'Claude: ready';
+      cDot.className = 'dot green'; cStatus.textContent = 'Gemini: ready';
     }
   } catch(e) {
-    document.getElementById('claude-status').textContent = 'Claude: server offline';
+    document.getElementById('gemini-status').textContent = 'Gemini: server offline';
   }
 }
 
@@ -614,8 +614,9 @@ async function sendMessage(){
   try {
     const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system,messages:chatHistory,max_tokens:1024})});
     const data=await res.json();
-    if(data.content?.[0]?.text){ const r=data.content[0].text; chatHistory.push({role:'assistant',content:r}); appendMsg('assistant',r); }
+    if(data.text){ const r=data.text; chatHistory.push({role:'assistant',content:r}); appendMsg('assistant',r); }
     else if(data.error){ appendMsg('assistant',`Error: ${data.error.message||data.error}`); }
+    else { appendMsg('assistant','Error: empty response from server.'); }
   } catch(e){ appendMsg('assistant',`Connection error: ${e.message}`); }
   btn.innerHTML='Send'; btn.disabled=false;
 }
@@ -623,7 +624,7 @@ async function sendMessage(){
 function appendMsg(role,text){
   const box=document.getElementById('chat-box');
   const now=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  const label=role==='user'?'You':'Claude';
+  const label=role==='user'?'You':'Gemini';
   const div=document.createElement('div'); div.className=`msg ${role}`;
   div.innerHTML=`<div class="bubble">${esc(text)}</div><div class="msg-meta">${label} · ${now}</div>`;
   box.appendChild(div); box.scrollTop=box.scrollHeight;
